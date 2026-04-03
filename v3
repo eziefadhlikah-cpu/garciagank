@@ -1,0 +1,26 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local event = ReplicatedStorage:WaitForChild("SellAllFishEvent")
+
+local player = game.Players.LocalPlayer
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "SellUI"
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- Frame
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 220, 0, 120)
+frame.Position = UDim2.new(0.5, -110, 0.5, -60)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+
+-- Title
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,30)
+title.Text = "AUTO SELL"
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.new(1,1,1)
+
+-- Toggle Button
+local toggle = Instance.new("TextButton", frame)
+toggle.Size = UDim2.new(0.8,0,0,40)
+toggle.Position = UDim2.new(
