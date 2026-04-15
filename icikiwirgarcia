@@ -1,0 +1,178 @@
+--[[
+
+CARA PAKAI:
+1. Buat RemoteEvent di ReplicatedStorage bernama:
+   ToggleAFKMoney
+
+2. Masukkan script ini ke ServerScriptService
+
+3. Ganti GAMEPASS_ID dengan ID gamepass milikmu
+
+4. Pastikan player memiliki leaderstats > Money
+
+]]
+
+local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local GAMEPASS_ID = 1234567890 -- GANTI DENGAN ID GAMEPASS KAMU
+local MONEY_PER_SECOND = 10000000
+local MONEY_NAME = "Money"
+
+local ToggleEvent = ReplicatedStorage:FindFirstChild("ToggleAFKMoney")
+
+if not ToggleEvent then
+	ToggleEvent = Instance.new("RemoteEvent")
+	ToggleEvent.Name = "ToggleAFKMoney"
+	ToggleEvent.Parent = ReplicatedStorage
+end
+
+local enabledPlayers = {}
+
+Players.PlayerAdded:Connect(function(player)
+	enabledPlayers[player] = true
+
+	-- Buat leaderstats jika belum ada
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if not leaderstats then
+		leaderstats = Instance.new("Folder")
+		leaderstats.Name = "leaderstats"
+		leaderstats.Parent = player
+	end
+
+	local money = leaderstats:FindFirstChild(MONEY_NAME)
+	if not money then
+		money = Instance.new("IntValue")
+		money.Name = MONEY_NAME
+		money.Value = 0
+		money.Parent = leaderstats
+	end
+
+	-- Buat GUI
+	player.CharacterAdded:Connect(function()
+		task.wait(1)
+
+		local playerGui = player:WaitForChild("PlayerGui")
+
+		if playerGui:FindFirstChild("AFKMoneyGui") then
+			playerGui.AFKMoneyGui:Destroy()
+		end
+
+		local gui = Instance.new("ScreenGui")
+		gui.Name = "AFKMoneyGui"
+		gui.ResetOnSpawn = false
+		gui.Parent = playerGui
+
+		local frame = Instance.new("Frame")
+		frame.Size = UDim2.new(0, 260, 0, 130)
+		frame.Position = UDim2.new(0.5, -130, 0.8, -65)
+		frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+		frame.BorderSizePixel = 0
+		frame.Parent = gui
+
+		local frameCorner = Instance.new("UICorner")
+		frameCorner.CornerRadius = UDim.new(0, 12)
+		frameCorner.Parent = frame
+
+		local title = Instance.new("TextLabel")
+		title.Size = UDim2.new(1, 0, 0, 40)
+		title.BackgroundTransparency = 1
+		title.Text = "AFK MONEY PASS"
+		title.TextColor3 = Color3.fromRGB(255,255,255)
+		title.TextScaled = true
+		title.Font = Enum.Font.GothamBold
+		title.Parent = frame
+
+		local status = Instance.new("TextLabel")
+		status.Name = "Status"
+		status.Size = UDim2.new(1, -20, 0, 25)
+		status.Position = UDim2.new(0, 10, 0, 45)
+		status.BackgroundTransparency = 1
+		status.Text = "Status: ON (+10.000.000/s)"
+		status.TextColor3 = Color3.fromRGB(0,255,100)
+		status.TextScaled = true
+		status.Font = Enum.Font.Gotham
+		status.Parent = frame
+
+		local button = Instance.new("TextButton")
+		button.Name = "ToggleButton"
+		button.Size = UDim2.new(0.8, 0, 0, 35)
+		button.Position = UDim2.new(0.1, 0, 0, 80)
+		button.BackgroundColor3 = Color3.fromRGB(0,170,0)
+		button.Text = "TURN OFF"
+		button.TextColor3 = Color3.fromRGB(255,255,255)
+		button.TextScaled = true
+		button.Font = Enum.Font.GothamBold
+		button.Parent = frame
+
+		local buttonCorner = Instance.new("UICorner")
+		buttonCorner.CornerRadius = UDim.new(0, 8)
+		buttonCorner.Parent = button
+
+		local localScript = Instance.new("LocalScript")
+		localScript.Parent = button
+		localScript.Source = [[
+			local button = script.Parent
+			local frame = button.Parent
+			local status = frame:WaitForChild("Status")
+
+			local ReplicatedStorage = game:GetService("ReplicatedStorage")
+			local event = ReplicatedStorage:WaitForChild("ToggleAFKMoney")
+
+			local enabled = true
+
+			button.MouseButton1Click:Connect(function()
+				enabled = not enabled
+
+				event:FireServer(enabled)
+
+				if enabled then
+					status.Text = "Status: ON (+10.000.000/s)"
+					status.TextColor3 = Color3.fromRGB(0,255,100)
+
+					button.Text = "TURN OFF"
+					button.BackgroundColor3 = Color3.fromRGB(0,170,0)
+				else
+					status.Text = "Status: OFF"
+					status.TextColor3 = Color3.fromRGB(255,80,80)
+
+					button.Text = "TURN ON"
+					button.BackgroundColor3 = Color3.fromRGB(170,0,0)
+				end
+			end)
+		]]
+	end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	enabledPlayers[player] = nil
+end)
+
+ToggleEvent.OnServerEvent:Connect(function(player, state)
+	enabledPlayers[player] = state and true or false
+end)
+
+task.spawn(function()
+	while true do
+		for _, player in ipairs(Players:GetPlayers()) do
+			if enabledPlayers[player] then
+				local success, ownsPass = pcall(function()
+					return MarketplaceService:UserOwnsGamePassAsync(player.UserId, GAMEPASS_ID)
+				end)
+
+				if success and ownsPass then
+					local leaderstats = player:FindFirstChild("leaderstats")
+					if leaderstats then
+						local money = leaderstats:FindFirstChild(MONEY_NAME)
+						if money then
+							money.Value += MONEY_PER_SECOND
+						end
+					end
+				end
+			end
+		end
+
+		task.wait(1)
+	end
+end)
