@@ -1,0 +1,777 @@
+--[[
+╔═══════════════════════════════════════════════════════════════════╗
+║                    GARCIA-HUB ULTIMATE V4.0                      ║
+║           Indonesia Driving Experience (IDEX) - ADAPTIVE         ║
+║                  [AUTO DETECT & AUTO FIX SYSTEM]                 ║
+╚═══════════════════════════════════════════════════════════════════╝
+--]]
+
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local userInput = game:GetService("UserInputService")
+local runService = game:GetService("RunService")
+local tween = game:GetService("TweenService")
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local lighting = game:GetService("Lighting")
+local players = game:GetService("Players")
+
+-- ============================
+-- AUTO DETECTION SYSTEM
+-- ============================
+local gameData = {
+    moneyLocations = {},
+    remoteEvents = {},
+    vehicleSeats = {},
+    antiCheat = false,
+    gameName = "Unknown"
+}
+
+-- Deteksi struktur game
+local function detectGameStructure()
+    -- Deteksi nama game
+    if game.PlaceId then
+        gameData.gameName = tostring(game.PlaceId)
+    end
+    
+    -- Cari lokasi Money
+    local function searchMoney(obj, depth)
+        if depth > 5 then return end
+        for _, child in ipairs(obj:GetChildren()) do
+            if child:IsA("IntValue") or child:IsA("NumberValue") then
+                local name = child.Name:lower()
+                if name:find("money") or name:find("cash") or name:find("uang") or name:find("coin") or name:find("point") then
+                    table.insert(gameData.moneyLocations, child)
+                end
+            elseif child:IsA("Folder") or child:IsA("Model") then
+                searchMoney(child, depth + 1)
+            end
+        end
+    end
+    
+    searchMoney(player, 0)
+    searchMoney(player:FindFirstChild("leaderstats"), 0)
+    searchMoney(replicatedStorage, 0)
+    
+    -- Cari Remote Events/Functions
+    for _, item in ipairs(replicatedStorage:GetDescendants()) do
+        if item:IsA("RemoteEvent") or item:IsA("RemoteFunction") then
+            table.insert(gameData.remoteEvents, item)
+        end
+    end
+    
+    -- Cari VehicleSeat
+    for _, item in ipairs(workspace:GetDescendants()) do
+        if item:IsA("VehicleSeat") then
+            table.insert(gameData.vehicleSeats, item)
+        end
+    end
+    
+    print("[GARCIA-HUB] Detected:", #gameData.moneyLocations, "money locations")
+    print("[GARCIA-HUB] Detected:", #gameData.remoteEvents, "remote events")
+    print("[GARCIA-HUB] Detected:", #gameData.vehicleSeats, "vehicle seats")
+end
+
+detectGameStructure()
+
+-- ============================
+-- PREMIUM GUI
+-- ============================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "GarciaHubUltimate"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 380, 0, 600)
+mainFrame.Position = UDim2.new(0.5, -190, 0.5, -300)
+mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+mainFrame.BackgroundTransparency = 0.1
+mainFrame.BorderSizePixel = 3
+mainFrame.BorderColor3 = Color3.fromRGB(255, 0, 100)
+mainFrame.ClipsDescendants = true
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+-- Header premium dengan efek neon
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 70)
+header.BackgroundColor3 = Color3.fromRGB(255, 0, 100)
+header.BackgroundTransparency = 0.15
+header.BorderSizePixel = 0
+header.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 1, 0)
+title.BackgroundTransparency = 1
+title.Text = "⚡ GARCIA-HUB ULTIMATE ⚡"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Parent = header
+
+local subtitle = Instance.new("TextLabel")
+subtitle.Size = UDim2.new(1, 0, 0, 25)
+subtitle.Position = UDim2.new(0, 0, 1, -30)
+subtitle.BackgroundTransparency = 1
+subtitle.Text = "IDEX | AUTO-DETECT | PREMIUM"
+subtitle.TextColor3 = Color3.fromRGB(255, 255, 0)
+subtitle.TextSize = 12
+subtitle.Font = Enum.Font.Gotham
+subtitle.Parent = header
+
+-- Tab menu
+local tabFrame = Instance.new("Frame")
+tabFrame.Size = UDim2.new(1, 0, 0, 45)
+tabFrame.Position = UDim2.new(0, 0, 0, 70)
+tabFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+tabFrame.BorderSizePixel = 0
+tabFrame.Parent = mainFrame
+
+local tabs = {"MAIN", "DRIVING", "PLAYER", "EXPLOIT", "VISUAL", "SETTINGS"}
+local currentTab = "MAIN"
+local tabButtons = {}
+
+local contentScroll = Instance.new("ScrollingFrame")
+contentScroll.Size = UDim2.new(1, -20, 1, -130)
+contentScroll.Position = UDim2.new(0, 10, 0, 120)
+contentScroll.BackgroundTransparency = 1
+contentScroll.ScrollBarThickness = 6
+contentScroll.CanvasSize = UDim2.new(0, 0, 0, 800)
+contentScroll.Parent = mainFrame
+
+local contentLayout = Instance.new("UIListLayout")
+contentLayout.Parent = contentScroll
+contentLayout.Padding = UDim.new(0, 6)
+contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Fungsi create toggle button
+local function createToggle(text, defaultValue, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -10, 0, 45)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    frame.BorderSizePixel = 1
+    frame.BorderColor3 = Color3.fromRGB(50, 50, 70)
+    frame.Parent = contentScroll
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(220, 220, 255)
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextSize = 14
+    label.Font = Enum.Font.Gotham
+    label.Parent = frame
+    
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 70, 0, 35)
+    btn.Position = UDim2.new(1, -80, 0.5, -17.5)
+    btn.BackgroundColor3 = defaultValue and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
+    btn.Text = defaultValue and "ON" or "OFF"
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 14
+    btn.Font = Enum.Font.GothamBold
+    btn.BorderSizePixel = 0
+    btn.Parent = frame
+    
+    local state = defaultValue
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.BackgroundColor3 = state and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
+        btn.Text = state and "ON" or "OFF"
+        callback(state)
+    end)
+    
+    return frame
+end
+
+local function createSlider(text, minVal, maxVal, defaultVal, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -10, 0, 70)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    frame.BorderSizePixel = 1
+    frame.BorderColor3 = Color3.fromRGB(50, 50, 70)
+    frame.Parent = contentScroll
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 25)
+    label.BackgroundTransparency = 1
+    label.Text = text .. ": " .. defaultVal
+    label.TextColor3 = Color3.fromRGB(220, 220, 255)
+    label.TextSize = 13
+    label.Font = Enum.Font.Gotham
+    label.Parent = frame
+    
+    local sliderBg = Instance.new("Frame")
+    sliderBg.Size = UDim2.new(1, -20, 0, 5)
+    sliderBg.Position = UDim2.new(0, 10, 0, 45)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    sliderBg.BorderSizePixel = 0
+    sliderBg.Parent = frame
+    
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new((defaultVal - minVal) / (maxVal - minVal), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(255, 0, 100)
+    fill.BorderSizePixel = 0
+    fill.Parent = sliderBg
+    
+    local valueDisplay = Instance.new("TextLabel")
+    valueDisplay.Size = UDim2.new(0, 50, 0, 25)
+    valueDisplay.Position = UDim2.new(1, -55, 0, 20)
+    valueDisplay.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+    valueDisplay.Text = tostring(defaultVal)
+    valueDisplay.TextColor3 = Color3.fromRGB(255, 255, 255)
+    valueDisplay.TextSize = 12
+    valueDisplay.Font = Enum.Font.GothamBold
+    valueDisplay.Parent = frame
+    
+    local currentVal = defaultVal
+    local dragging = false
+    
+    sliderBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+        end
+    end)
+    
+    sliderBg.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    userInput.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local mousePos = userInput:GetMouseLocation()
+            local sliderPos = sliderBg.AbsolutePosition
+            local percent = math.clamp((mousePos.X - sliderPos.X) / sliderBg.AbsoluteSize.X, 0, 1)
+            currentVal = minVal + (maxVal - minVal) * percent
+            currentVal = math.floor(currentVal * 10) / 10
+            fill.Size = UDim2.new(percent, 0, 1, 0)
+            valueDisplay.Text = tostring(currentVal)
+            label.Text = text .. ": " .. currentVal
+            callback(currentVal)
+        end
+    end)
+    
+    return frame
+end
+
+-- ============================
+-- FITUR-FITUR CHEAT
+-- ============================
+local features = {
+    autoEarn = false,
+    autoDrive = false,
+    speedHack = false,
+    flyMode = false,
+    noclip = false,
+    godMode = false,
+    infiniteFuel = false,
+    autoRepair = false,
+    teleport = false,
+    esp = false,
+    aimbot = false
+}
+
+local speedValue = 80
+local flySpeed = 50
+local flyBodyVel = nil
+local noclipConn = nil
+
+-- AUTO EARN MONEY (ADAPTIF)
+local function autoEarnLoop()
+    while true do
+        wait(0.3)
+        if features.autoEarn then
+            -- Method 1: Langsung ubah nilai
+            for _, money in ipairs(gameData.moneyLocations) do
+                pcall(function()
+                    money.Value = money.Value + 10000
+                end)
+            end
+            
+            -- Method 2: Remote event spoofing
+            for _, remote in ipairs(gameData.remoteEvents) do
+                pcall(function()
+                    if remote.Name:lower():find("earn") or remote.Name:lower():find("money") or remote.Name:lower():find("drive") then
+                        remote:FireServer("AddMoney", 10000)
+                        remote:FireServer("Earn", 10000)
+                        remote:FireServer("GetReward", 10000)
+                    end
+                end)
+            end
+            
+            -- Method 3: GUI simulation (klik tombol jika ada)
+            for _, btn in ipairs(player.PlayerGui:GetDescendants()) do
+                if btn:IsA("TextButton") and (btn.Text:lower():find("claim") or btn.Text:lower():find("earn")) then
+                    pcall(function() btn:Fire() end)
+                end
+            end
+        end
+    end
+end
+
+-- AUTO DRIVE
+local function autoDriveLoop()
+    while true do
+        wait(0.5)
+        if features.autoDrive then
+            local vehicle = character:FindFirstChildOfClass("VehicleSeat")
+            if not vehicle then
+                for _, seat in ipairs(gameData.vehicleSeats) do
+                    if seat and seat.Parent and (seat.Parent.Position - character.HumanoidRootPart.Position).Magnitude < 15 then
+                        character.HumanoidRootPart.CFrame = seat.CFrame
+                        vehicle = seat
+                        break
+                    end
+                end
+            end
+            
+            if vehicle then
+                pcall(function()
+                    vehicle.Throttle = 1
+                    vehicle.Steer = math.sin(tick() * 1.5) * 0.7
+                end)
+            end
+        end
+    end
+end
+
+-- SPEED HACK
+local function speedHackHandler()
+    while true do
+        wait()
+        if features.speedHack and humanoid then
+            humanoid.WalkSpeed = speedValue
+        elseif humanoid and not features.speedHack then
+            humanoid.WalkSpeed = 16
+        end
+    end
+end
+
+-- FLY MODE
+local function flyHandler()
+    while true do
+        wait()
+        if features.flyMode then
+            if not flyBodyVel or flyBodyVel.Parent ~= character.HumanoidRootPart then
+                flyBodyVel = Instance.new("BodyVelocity")
+                flyBodyVel.MaxForce = Vector3.new(10000, 10000, 10000)
+                flyBodyVel.Parent = character.HumanoidRootPart
+                
+                local bg = Instance.new("BodyGyro")
+                bg.MaxTorque = Vector3.new(10000, 10000, 10000)
+                bg.Parent = character.HumanoidRootPart
+            end
+            
+            local move = Vector3.new()
+            if userInput:IsKeyDown(Enum.KeyCode.W) then move = move + Vector3.new(0, 0, -1) end
+            if userInput:IsKeyDown(Enum.KeyCode.S) then move = move + Vector3.new(0, 0, 1) end
+            if userInput:IsKeyDown(Enum.KeyCode.A) then move = move + Vector3.new(-1, 0, 0) end
+            if userInput:IsKeyDown(Enum.KeyCode.D) then move = move + Vector3.new(1, 0, 0) end
+            if userInput:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0, 1, 0) end
+            if userInput:IsKeyDown(Enum.KeyCode.LeftControl) then move = move + Vector3.new(0, -1, 0) end
+            
+            if move.Magnitude > 0 then move = move.Unit end
+            
+            local cam = workspace.CurrentCamera
+            flyBodyVel.Velocity = (cam.CFrame.LookVector * move.Z + cam.CFrame.RightVector * move.X + cam.CFrame.UpVector * move.Y) * flySpeed
+            
+            if humanoid then humanoid.PlatformStand = true end
+        else
+            if flyBodyVel then flyBodyVel:Destroy() end
+            if humanoid then humanoid.PlatformStand = false end
+        end
+    end
+end
+
+-- NOCLIP
+local function noclipHandler()
+    while true do
+        wait(0.1)
+        if features.noclip and character then
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        elseif character then
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+    end
+end
+
+-- GOD MODE
+local function godModeHandler()
+    while true do
+        wait(0.5)
+        if features.godMode and humanoid then
+            humanoid.MaxHealth = math.huge
+            humanoid.Health = math.huge
+            humanoid.BreakJointsOnDeath = false
+        elseif humanoid then
+            humanoid.MaxHealth = 100
+            humanoid.BreakJointsOnDeath = true
+        end
+    end
+end
+
+-- INFINITE FUEL
+local function infiniteFuelHandler()
+    while true do
+        wait(1)
+        if features.infiniteFuel then
+            for _, fuel in ipairs(workspace:GetDescendants()) do
+                if fuel.Name:lower():find("fuel") and fuel:IsA("NumberValue") then
+                    fuel.Value = 100
+                end
+            end
+        end
+    end
+end
+
+-- AUTO REPAIR
+local function autoRepairHandler()
+    while true do
+        wait(3)
+        if features.autoRepair then
+            local vehicle = character:FindFirstChildOfClass("VehicleSeat")
+            if vehicle and vehicle.Parent then
+                for _, part in ipairs(vehicle.Parent:GetDescendants()) do
+                    if part:IsA("BasePart") and part:FindFirstChild("Health") then
+                        part.Health.Value = 100
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- TELEPORT TO WAYPOINTS
+local waypoints = {}
+local function findWaypoints()
+    for _, item in ipairs(workspace:GetDescendants()) do
+        if item.Name:lower():find("waypoint") or item.Name:lower():find("checkpoint") or item.Name:lower():find("node") then
+            if item:IsA("BasePart") or item:IsA("Model") then
+                table.insert(waypoints, item)
+            end
+        end
+    end
+end
+
+local function teleportHandler()
+    findWaypoints()
+    while true do
+        wait(2)
+        if features.teleport and #waypoints > 0 then
+            for _, wp in ipairs(waypoints) do
+                local pos = wp:IsA("Model") and wp.PrimaryPart and wp.PrimaryPart.Position or wp.Position
+                if pos and character and character.HumanoidRootPart then
+                    character.HumanoidRootPart.CFrame = CFrame.new(pos)
+                    wait(1)
+                end
+            end
+        end
+    end
+end
+
+-- ============================
+-- BUILD UI PER TAB
+-- ============================
+local function buildMainTab()
+    for _, btn in pairs(contentScroll:GetChildren()) do
+        if btn:IsA("Frame") then btn:Destroy() end
+    end
+    
+    createToggle("💰 AUTO EARN MONEY", false, function(v) features.autoEarn = v end)
+    createToggle("🚗 AUTO DRIVE", false, function(v) features.autoDrive = v end)
+    createToggle("⚡ SPEED HACK", false, function(v) features.speedHack = v end)
+    createSlider("SPEED VALUE", 16, 250, 80, function(v) speedValue = v end)
+    createToggle("🕊️ FLY MODE", false, function(v) features.flyMode = v end)
+    createToggle("🔧 NOCLIP", false, function(v) features.noclip = v end)
+    createToggle("👑 GOD MODE", false, function(v) features.godMode = v end)
+    createToggle("🗺️ TELEPORT WAYPOINTS", false, function(v) features.teleport = v end)
+end
+
+local function buildDrivingTab()
+    for _, btn in pairs(contentScroll:GetChildren()) do
+        if btn:IsA("Frame") then btn:Destroy() end
+    end
+    
+    createToggle("⛽ INFINITE FUEL", false, function(v) features.infiniteFuel = v end)
+    createToggle("🔧 AUTO REPAIR", false, function(v) features.autoRepair = v end)
+    createToggle("🚀 VEHICLE SPEED BOOST", false, function(v) 
+        if v then
+            runService.RenderStepped:Connect(function()
+                local vehicle = character:FindFirstChildOfClass("VehicleSeat")
+                if vehicle and vehicle.Parent then
+                    local engine = vehicle.Parent:FindFirstChild("Engine") or Instance.new("BodyVelocity")
+                    engine.MaxForce = Vector3.new(100000, 0, 100000)
+                    engine.Velocity = vehicle.Parent.PrimaryPart.CFrame.LookVector * 300
+                    engine.Parent = vehicle.Parent
+                end
+            end)
+        end
+    end)
+    createToggle("🔄 DRIFT MODE", false, function(v)
+        if v then
+            runService.RenderStepped:Connect(function()
+                local vehicle = character:FindFirstChildOfClass("VehicleSeat")
+                if vehicle and vehicle.Parent and vehicle.Parent.PrimaryPart then
+                    vehicle.Parent.PrimaryPart.RotVelocity = Vector3.new(0, 30, 0)
+                end
+            end)
+        end
+    end)
+    createToggle("🎮 INSTANT BRAKE (SPACE)", false, function(v)
+        if v then
+            userInput.InputBegan:Connect(function(input)
+                if input.KeyCode == Enum.KeyCode.Space then
+                    local vehicle = character:FindFirstChildOfClass("VehicleSeat")
+                    if vehicle then
+                        vehicle.Throttle = -1
+                        task.wait(0.1)
+                        vehicle.Throttle = 0
+                    end
+                end
+            end)
+        end
+    end)
+end
+
+local function buildPlayerTab()
+    for _, btn in pairs(contentScroll:GetChildren()) do
+        if btn:IsA("Frame") then btn:Destroy() end
+    end
+    
+    createToggle("🦘 JUMP POWER BOOST", false, function(v)
+        if v and humanoid then
+            humanoid.JumpPower = 150
+        elseif humanoid then
+            humanoid.JumpPower = 50
+        end
+    end)
+    createToggle("💪 INFINITE STAMINA", false, function(v)
+        if v then
+            runService.RenderStepped:Connect(function()
+                if humanoid then
+                    humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+                end
+            end)
+        end
+    end)
+    createToggle("📦 AUTO COLLECT ITEMS", false, function(v)
+        if v then
+            spawn(function()
+                while v do
+                    wait(0.2)
+                    for _, item in ipairs(workspace:GetDescendants()) do
+                        if item:IsA("BasePart") and (item.Name:lower():find("coin") or item.Name:lower():find("item")) then
+                            if character and character.HumanoidRootPart then
+                                character.HumanoidRootPart.CFrame = item.CFrame
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+end
+
+local function buildExploitTab()
+    for _, btn in pairs(contentScroll:GetChildren()) do
+        if btn:IsA("Frame") then btn:Destroy() end
+    end
+    
+    createToggle("💥 CRASH OTHER PLAYERS", false, function(v)
+        if v then
+            for _, other in ipairs(players:GetPlayers()) do
+                if other ~= player then
+                    for i = 1, 500 do
+                        local remote = Instance.new("RemoteEvent")
+                        remote.Name = "Crash_" .. i
+                        remote.Parent = replicatedStorage
+                        remote:FireClient(other)
+                        task.wait()
+                    end
+                end
+            end
+        end
+    end)
+    createToggle("🌡️ LAG SERVER", false, function(v)
+        if v then
+            for i = 1, 10000 do
+                local p = Instance.new("Part")
+                p.Size = Vector3.new(10, 10, 10)
+                p.Position = Vector3.new(math.random(-5000, 5000), math.random(-100, 500), math.random(-5000, 5000))
+                p.Anchored = true
+                p.Parent = workspace
+                game:GetService("Debris"):AddItem(p, 0.1)
+            end
+        end
+    end)
+    createToggle("🎁 UNLOCK ALL GAMEPASS", false, function(v)
+        if v then
+            local passes = {"VIP", "PREMIUM", "GOLD", "SPEED_BOOST", "MONEY_MULTI"}
+            for _, pass in ipairs(passes) do
+                local bool = Instance.new("BoolValue")
+                bool.Name = pass
+                bool.Value = true
+                bool.Parent = player
+            end
+        end
+    end)
+end
+
+local function buildVisualTab()
+    for _, btn in pairs(contentScroll:GetChildren()) do
+        if btn:IsA("Frame") then btn:Destroy() end
+    end
+    
+    createToggle("🌈 RAINBOW CAR", false, function(v)
+        if v then
+            runService.RenderStepped:Connect(function()
+                local vehicle = character:FindFirstChildOfClass("VehicleSeat")
+                if vehicle and vehicle.Parent then
+                    local hue = tick() % 5 / 5
+                    for _, part in ipairs(vehicle.Parent:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.Color = Color3.fromHSV(hue, 1, 1)
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+    createToggle("☀️ ALWAYS DAY", false, function(v)
+        if v then
+            runService.RenderStepped:Connect(function()
+                lighting.ClockTime = 14
+            end)
+        end
+    end)
+    createToggle("👁️ PLAYER ESP", false, function(v)
+        if v then
+            -- Simple ESP
+            for _, plr in ipairs(players:GetPlayers()) do
+                if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    local bill = Instance.new("BillboardGui")
+                    bill.Size = UDim2.new(0, 100, 0, 30)
+                    bill.AlwaysOnTop = true
+                    bill.Parent = plr.Character.HumanoidRootPart
+                    
+                    local label = Instance.new("TextLabel")
+                    label.Size = UDim2.new(1, 0, 1, 0)
+                    label.BackgroundTransparency = 1
+                    label.Text = plr.Name
+                    label.TextColor3 = Color3.fromRGB(255, 0, 0)
+                    label.TextScaled = true
+                    label.Parent = bill
+                end
+            end
+        end
+    end)
+end
+
+local function buildSettingsTab()
+    for _, btn in pairs(contentScroll:GetChildren()) do
+        if btn:IsA("Frame") then btn:Destroy() end
+    end
+    
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0.9, 0, 0, 50)
+    closeBtn.Position = UDim2.new(0.05, 0, 0, 10)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+    closeBtn.Text = "CLOSE GUI"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.TextSize = 18
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.Parent = contentScroll
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        screenGui.Enabled = false
+    end)
+    
+    local reScanBtn = Instance.new("TextButton")
+    reScanBtn.Size = UDim2.new(0.9, 0, 0, 50)
+    reScanBtn.Position = UDim2.new(0.05, 0, 0, 70)
+    reScanBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+    reScanBtn.Text = "RESCAN GAME STRUCTURE"
+    reScanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    reScanBtn.TextSize = 16
+    reScanBtn.Font = Enum.Font.GothamBold
+    reScanBtn.Parent = contentScroll
+    
+    reScanBtn.MouseButton1Click:Connect(function()
+        detectGameStructure()
+        print("[GARCIA-HUB] Rescan complete!")
+    end)
+end
+
+-- Tab switching
+for i, tabName in ipairs(tabs) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1/#tabs, -2, 1, -4)
+    btn.Position = UDim2.new((i-1)/#tabs, 1, 0, 2)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+    btn.Text = tabName
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.TextSize = 12
+    btn.Font = Enum.Font.GothamBold
+    btn.BorderSizePixel = 0
+    btn.Parent = tabFrame
+    tabButtons[tabName] = btn
+    
+    btn.MouseButton1Click:Connect(function()
+        currentTab = tabName
+        for _, tb in pairs(tabButtons) do
+            tb.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+            tb.TextColor3 = Color3.fromRGB(200, 200, 200)
+        end
+        btn.BackgroundColor3 = Color3.fromRGB(255, 0, 100)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        
+        if tabName == "MAIN" then buildMainTab()
+        elseif tabName == "DRIVING" then buildDrivingTab()
+        elseif tabName == "PLAYER" then buildPlayerTab()
+        elseif tabName == "EXPLOIT" then buildExploitTab()
+        elseif tabName == "VISUAL" then buildVisualTab()
+        elseif tabName == "SETTINGS" then buildSettingsTab()
+        end
+    end)
+end
+
+-- Start all core loops
+spawn(autoEarnLoop)
+spawn(autoDriveLoop)
+spawn(speedHackHandler)
+spawn(flyHandler)
+spawn(noclipHandler)
+spawn(godModeHandler)
+spawn(infiniteFuelHandler)
+spawn(autoRepairHandler)
+spawn(teleportHandler)
+
+-- Initialize default tab
+tabButtons["MAIN"].BackgroundColor3 = Color3.fromRGB(255, 0, 100)
+tabButtons["MAIN"].TextColor3 = Color3.fromRGB(255, 255, 255)
+buildMainTab()
+
+-- Hotkey F5 untuk toggle
+userInput.InputBegan:Connect(function(input, gp)
+    if not gp and input.KeyCode == Enum.KeyCode.F5 then
+        screenGui.Enabled = not screenGui.Enabled
+    end
+end)
+
+print("═══════════════════════════════════════════════")
+print("     GARCIA-HUB ULTIMATE V4.0 LOADED")
+print("     Press F5 to toggle GUI")
+print("     Auto-detect system active")
+print("═══════════════════════════════════════════════")
